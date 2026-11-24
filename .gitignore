@@ -32,3 +32,10 @@ AdaptixClient/Libs/kddockwidgets/*_export.h
 # macOS
 .DS_Store
 **/.DS_Store
+# Contracts (hardhat)
+contracts/node_modules/
+contracts/artifacts/
+contracts/cache/
+
+# Agent per-arch build scratch
+AdaptixServer/extenders/gopher_agent/src_gopher/build/

@@ -666,6 +666,39 @@ static CommandsGroup parseCommandsGroup(const QString &scriptName, const QJsonAr
     return cg;
 }
 
+void AdaptixWidget::RefreshScriptLibrary()
+{
+    if (scriptLibraryPending)
+        return;
+
+    AuthProfile* profile = GetProfile();
+    if (!profile)
+        return;
+
+    scriptLibraryPending = true;
+    QPointer<AdaptixWidget> safeThis = this;
+    HttpReqAutomationScriptsListAsync(*profile,
+        [safeThis](bool success, const QString &, const QJsonObject &response) {
+            if (!safeThis)
+                return;
+
+            safeThis->scriptLibraryPending = false;
+            if (!success || !response.value("ok").toBool())
+                return;
+
+            safeThis->scriptLibraryCache = response.value("scripts").toArray();
+            safeThis->scriptLibraryLoaded = true;
+            Q_EMIT safeThis->ScriptLibraryRefreshed();
+        });
+}
+
+QJsonArray AdaptixWidget::ScriptLibrary() const
+{
+    if (!scriptLibraryLoaded)
+        const_cast<AdaptixWidget*>(this)->RefreshScriptLibrary();
+    return scriptLibraryCache;
+}
+
 void AdaptixWidget::RegisterAgentConfig(const QString &agentName, const QString &ax_script, const QStringList &listeners, const bool &multiListeners, const QJsonArray &groups)
 {
     AgentTypes[agentName] = AgentTypeInfo{multiListeners, listeners};

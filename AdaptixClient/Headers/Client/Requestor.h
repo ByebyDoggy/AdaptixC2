@@ -72,4 +72,20 @@ void HttpReqAxScriptCommandsAsync(AuthProfile& profile, const HttpCallback &call
 void HttpReqAxScriptLoadAsync(const QString &name, const QString &script, AuthProfile& profile, const HttpCallback &callback);
 void HttpReqAxScriptUnloadAsync(const QString &name, AuthProfile& profile, const HttpCallback &callback);
 
+void HttpReqChainConfigGetAsync(AuthProfile& profile, const HttpCallback &callback);
+void HttpReqChainConfigSetAsync(const QJsonObject &config, AuthProfile& profile, const HttpCallback &callback);
+void HttpReqChainStatusAsync(AuthProfile& profile, const HttpCallback &callback);
+void HttpReqChainCalldataAsync(const QString &domain, AuthProfile& profile, const HttpCallback &callback);
+
+void HttpReqAutomationRulesListAsync(AuthProfile& profile, const HttpCallback &callback);
+void HttpReqAutomationRuleSetAsync(const QString &id, bool enabled, const QJsonObject &extra, AuthProfile& profile, const HttpCallback &callback);
+void HttpReqAutomationRuleUpdateAsync(const QJsonObject &patch, AuthProfile& profile, const HttpCallback &callback);
+void HttpReqAutomationTemplatesListAsync(AuthProfile& profile, const HttpCallback &callback);
+void HttpReqAutomationTemplateSetAsync(const QString &kind, const QString &id, const QJsonObject &templateData, AuthProfile& profile, const HttpCallback &callback);
+void HttpReqAutomationTemplateDeleteAsync(const QString &kind, const QString &id, AuthProfile& profile, const HttpCallback &callback);
+void HttpReqAutomationChannelsListAsync(AuthProfile& profile, const HttpCallback &callback);
+void HttpReqAutomationChannelSetAsync(const QString &id, const QString &sendKey, const QString &apiBase, AuthProfile& profile, const HttpCallback &callback);
+void HttpReqAutomationScriptsListAsync(AuthProfile& profile, const HttpCallback &callback);
+void HttpReqAutomationScriptRunAsync(const QString &agentId, const QString &scriptId, const QStringList &args, AuthProfile& profile, const HttpCallback &callback);
+
 #endif

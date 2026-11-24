@@ -41,7 +41,7 @@ namespace TitleBarStyle {
     {
         bool light = isLightTheme(themeName);
 
-#if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
+#if QT_VERSION >= QT_VERSION_CHECK(6, 8, 0)
         QGuiApplication::styleHints()->setColorScheme(
             light ? Qt::ColorScheme::Light : Qt::ColorScheme::Dark
         );

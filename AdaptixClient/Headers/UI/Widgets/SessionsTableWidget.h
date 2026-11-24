@@ -10,6 +10,8 @@
 #include <Client/Settings.h>
 
 #include <QSortFilterProxyModel>
+#include <QPointer>
+#include <QMenu>
 
 class Agent;
 class AdaptixWidget;
@@ -455,11 +457,18 @@ Q_OBJECT
     bool bufferingEnabled = false;
     QList<Agent*> pendingAgents;
 
+    // Live Scripts submenu, rebuilt when the script library finishes loading
+    // while the context menu is open.
+    QPointer<QMenu>  liveScriptsMenu;
+    QStringList      liveScriptsAgents;
+
     void createUI();
     void flushPendingAgents();
+    void buildScriptsMenu(QMenu* parent, const QStringList &agentIds);
 
 public:
     AgentsTableModel* agentsModel = nullptr;
+    QStringList selectedAgentIds() const;
     explicit SessionsTableWidget( AdaptixWidget* w );
     ~SessionsTableWidget() override;
 

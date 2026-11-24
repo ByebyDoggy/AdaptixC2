@@ -7,7 +7,11 @@ set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 if(WIN32)
-    set(Qt6_DIR "C:/msys64/mingw64/lib/cmake")
+    if(DEFINED ENV{QT_TARGET_DIR})
+        set(Qt6_DIR "$ENV{QT_TARGET_DIR}/lib/cmake")
+    else()
+        set(Qt6_DIR "C:/msys64/mingw64/lib/cmake")
+    endif()
 endif()
 set(QT_NO_PRIVATE_MODULE_WARNING ON)
 
@@ -17,7 +21,7 @@ add_subdirectory(Libs/qlementine)
 if(WIN32 AND MINGW)
     set(OPENSSL_USE_STATIC_LIBS TRUE)
 endif()
-find_package( OpenSSL REQUIRED )
+find_package( OpenSSL QUIET )
 
 if(WIN32 AND MINGW)
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,-subsystem,windows")
@@ -124,6 +128,9 @@ SET( HEADERS
         Headers/UI/Dialogs/DialogSettings.h
         Headers/Client/Extender.h
         Headers/UI/Dialogs/DialogExtender.h
+        Headers/UI/Dialogs/DialogChain.h
+        Headers/UI/Dialogs/DialogAutomation.h
+        Headers/UI/Dialogs/DialogAutomationRule.h
         Headers/Utils/CustomElements.h
         Headers/Client/Settings.h
         Headers/Client/ConsoleTheme.h
@@ -215,6 +222,9 @@ add_executable(AdaptixClient
         Source/UI/Dialogs/DialogSettings.cpp
         Source/Client/Extender.cpp
         Source/UI/Dialogs/DialogExtender.cpp
+        Source/UI/Dialogs/DialogChain.cpp
+        Source/UI/Dialogs/DialogAutomation.cpp
+        Source/UI/Dialogs/DialogAutomationRule.cpp
         Source/Utils/CustomElements.cpp
         Source/Client/Settings.cpp
         Source/Client/ConsoleTheme.cpp
@@ -275,11 +285,14 @@ target_link_libraries( AdaptixClient
         Qt6::WebSockets
         Qt6::Sql
         Qt6::Qml
-        OpenSSL::Crypto
 
         kddockwidgets
         qlementine
 )
+
+if(TARGET OpenSSL::Crypto)
+    target_link_libraries( AdaptixClient PRIVATE OpenSSL::Crypto )
+endif()
 
 if(WIN32)
     target_link_libraries( AdaptixClient

@@ -1,0 +1,19 @@
+{
+  "name": "adaptix-domain-registry",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Owner-controlled C2 host registry for AdaptixC2 domain hot-switching",
+  "scripts": {
+    "test": "hardhat test",
+    "deploy:bsc": "hardhat run scripts/deploy.js --network bscTestnet",
+    "set-domain:bsc": "hardhat run scripts/set-domain.js --network bscTestnet",
+    "read:bsc": "hardhat run scripts/read-config.js --network bscTestnet"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-chai-matchers": "^2.1.2",
+    "@nomicfoundation/hardhat-ethers": "^3.0.8",
+    "chai": "^4.5.0",
+    "ethers": "^6.13.4",
+    "hardhat": "^2.22.17"
+  }
+}

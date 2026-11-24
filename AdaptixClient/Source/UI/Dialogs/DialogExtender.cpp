@@ -58,7 +58,7 @@ static QTableView* createScriptTable(QWidget* parent, QStandardItemModel* model,
 
 void DialogExtender::createUI()
 {
-    this->setWindowTitle("AxScript manager");
+    this->setWindowTitle("AxScript 编排（.axs）");
     this->resize(1200, 700);
     this->setProperty("Main", "base");
 
@@ -111,8 +111,8 @@ void DialogExtender::createUI()
     serverLayout->addWidget(serverSplitter, 1);
 
     tabWidget = new QTabWidget(this);
-    tabWidget->addTab(splitter, "Local Scripts");
-    tabWidget->addTab(serverTab, "Server Scripts");
+    tabWidget->addTab(splitter, "Local AxScript (.axs)");
+    tabWidget->addTab(serverTab, "Server AxScript (.axs)");
 
     spacer1 = new QSpacerItem(40, 20, QSizePolicy::Expanding, QSizePolicy::Minimum);
     spacer2 = new QSpacerItem(40, 20, QSizePolicy::Expanding, QSizePolicy::Minimum);

@@ -3,6 +3,8 @@
 
 #include <QLoggingCategory>
 #include <QSslSocket>
+#include <QNetworkProxy>
+#include <QNetworkProxyFactory>
 
 MainAdaptix* GlobalClient = nullptr;
 
@@ -37,6 +39,11 @@ int main(int argc, char *argv[])
     );
 
     QApplication a(argc, argv);
+
+    // Do not use system proxy / WPAD auto-detection: it adds ~5s per request on
+    // Windows and makes the 5s websocket handshake timer fire spuriously.
+    QNetworkProxyFactory::setUseSystemConfiguration(false);
+    QNetworkProxy::setApplicationProxy(QNetworkProxy(QNetworkProxy::NoProxy));
 
     // Force early SSL backend initialization
     QSslSocket::supportsSsl();

@@ -1,0 +1,22 @@
+{
+  "id": "cleanup_persistence",
+  "name": "清理持久化后门",
+  "description": "移除带 adaptix-persist 标记的 SSH key / cron / systemd 持久化。不会触碰目标上原有的同类配置，也不清理行动痕迹。",
+  "os": ["linux", "macos"],
+  "args": [
+    {
+      "name": "--user",
+      "description": "目标用户，默认当前用户",
+      "required": false,
+      "default": ""
+    },
+    {
+      "name": "--dry-run",
+      "description": "只打印将要执行的删除动作",
+      "required": false,
+      "default": ""
+    }
+  ],
+  "destructive": true,
+  "version": "1.0"
+}

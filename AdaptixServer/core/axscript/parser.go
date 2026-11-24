@@ -6,23 +6,64 @@ import (
 	"strings"
 )
 
+// tokenSpan is one token together with the byte offset of its first raw
+// character in the original command line (an opening quote included). The raw
+// tail is needed because Tokenize unquotes values: a trailing free-form
+// argument such as `run ... "-p" "a b"` must keep its quoting when it is
+// forwarded verbatim to a shell-like consumer.
+type tokenSpan struct {
+	Value string
+	Start int
+}
+
+// Tokenize splits a command line into unquoted tokens.
 func Tokenize(cmdline string) []string {
-	var tokens []string
+	spans := TokenizeWithSpans(cmdline)
+	tokens := make([]string, len(spans))
+	for i, span := range spans {
+		tokens[i] = span.Value
+	}
+	return tokens
+}
+
+// TokenizeWithSpans is Tokenize that also records where each token started in
+// the raw input.
+func TokenizeWithSpans(cmdline string) []tokenSpan {
+	var spans []tokenSpan
 	var token strings.Builder
+	start := -1
 	inQuotes := false
 	runes := []rune(cmdline)
 	length := len(runes)
+
+	// runeOffsets[i] is the byte offset of rune i in the raw string.
+	runeOffsets := make([]int, length+1)
+	{
+		pos := 0
+		for i, r := range runes {
+			runeOffsets[i] = pos
+			pos += len(string(r))
+		}
+		runeOffsets[length] = pos
+	}
 
 	for i := 0; i < length; {
 		c := runes[i]
 
 		if c == ' ' && !inQuotes {
 			if token.Len() > 0 {
-				tokens = append(tokens, token.String())
+				spans = append(spans, tokenSpan{Value: token.String(), Start: start})
 				token.Reset()
+				start = -1
 			}
 			i++
 			continue
+		}
+
+		if start < 0 {
+			// Record where the token begins; an opening quote counts as the
+			// start so a raw tail keeps the quoting style.
+			start = runeOffsets[i]
 		}
 
 		if c == '"' {
@@ -60,16 +101,21 @@ func Tokenize(cmdline string) []string {
 	}
 
 	if token.Len() > 0 {
-		tokens = append(tokens, token.String())
+		spans = append(spans, tokenSpan{Value: token.String(), Start: start})
 	}
 
-	return tokens
+	return spans
 }
 
 func ParseCommand(cmdline string, resolved *ResolvedCommand) (*ParsedCommand, error) {
-	tokens := Tokenize(cmdline)
-	if len(tokens) == 0 {
+	spans := TokenizeWithSpans(cmdline)
+	if len(spans) == 0 {
 		return nil, fmt.Errorf("empty command line")
+	}
+
+	tokens := make([]string, len(spans))
+	for i, span := range spans {
+		tokens[i] = span.Value
 	}
 
 	result := &ParsedCommand{
@@ -82,6 +128,7 @@ func ParseCommand(cmdline string, resolved *ResolvedCommand) (*ParsedCommand, er
 
 	var cmdDef *CommandDef
 	argTokens := tokens[1:]
+	tokenShift := 1
 
 	if resolved.Subcommand != nil {
 		if len(tokens) < 2 {
@@ -91,12 +138,14 @@ func ParseCommand(cmdline string, resolved *ResolvedCommand) (*ParsedCommand, er
 		result.Args["subcommand"] = tokens[1]
 		cmdDef = resolved.Subcommand
 		argTokens = tokens[2:]
+		tokenShift = 2
 	} else {
 		cmdDef = resolved.Command
 	}
 
 	parsedArgsMap := make(map[string]string)
 	var lastKey string
+	lastKeyStart := -1
 
 	for i := 0; i < len(argTokens); i++ {
 		arg := argTokens[i]
@@ -107,30 +156,47 @@ func ParseCommand(cmdline string, resolved *ResolvedCommand) (*ParsedCommand, er
 				if commandArg.Type == ArgTypeBool && commandArg.Mark == arg {
 					parsedArgsMap[commandArg.Mark] = "true"
 					lastKey = commandArg.Mark
+					lastKeyStart = -1
 					isWideArgs = false
 					break
 				} else if commandArg.Mark == arg && i+1 < len(argTokens) {
 					i++
 					parsedArgsMap[commandArg.Name] = argTokens[i]
 					lastKey = commandArg.Name
+					lastKeyStart = -1
+					if absVal := i + tokenShift; absVal < len(spans) {
+						lastKeyStart = spans[absVal].Start
+					}
 					isWideArgs = false
 					break
 				}
 			} else if _, exists := parsedArgsMap[commandArg.Name]; !exists {
 				parsedArgsMap[commandArg.Name] = arg
 				lastKey = commandArg.Name
+				lastKeyStart = -1
+				if absPos := i + tokenShift; absPos < len(spans) {
+					lastKeyStart = spans[absPos].Start
+				}
 				isWideArgs = false
 				break
 			}
 		}
 
 		if isWideArgs && lastKey != "" {
-			var wide strings.Builder
-			for j := i; j < len(argTokens); j++ {
-				wide.WriteString(" ")
-				wide.WriteString(argTokens[j])
+			// The remainder is a free-form argument (e.g. `run` args or a cron
+			// schedule). Replace the accumulated value with the RAW tail
+			// starting at lastKey's first token: Tokenize already unquoted the
+			// tokens, and consumers like the agent's shlex.Split need the
+			// quotes back to keep values containing spaces in one piece.
+			start := lastKeyStart
+			if start < 0 {
+				if abs := i + tokenShift; abs < len(spans) {
+					start = spans[abs].Start
+				}
 			}
-			parsedArgsMap[lastKey] += wide.String()
+			if start >= 0 && start < len(cmdline) {
+				parsedArgsMap[lastKey] = strings.TrimRight(cmdline[start:], " ")
+			}
 			break
 		}
 	}

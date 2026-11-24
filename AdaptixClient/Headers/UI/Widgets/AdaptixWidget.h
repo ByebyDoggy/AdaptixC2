@@ -165,6 +165,10 @@ public:
     QMap<QString, TunnelEndpoint*>   ClientTunnels;
     QStringList addresses;
 
+    QJsonArray  scriptLibraryCache;
+    bool        scriptLibraryLoaded = false;
+    bool        scriptLibraryPending = false;
+
     struct ExtDockEntry {
         QString id;
         QString title;
@@ -192,6 +196,12 @@ public:
 
     void RegisterListenerConfig(const QString &name, const QString &protocol, const QString &type, const QString &ax_script);
     void RegisterAgentConfig(const QString &agentName, const QString &ax_script, const QStringList &listenersconst, const bool &multiListeners, const QJsonArray &groups);
+
+    // Shell script library cache, filled from /automation/scripts/list and used
+    // by the sessions table context menu.
+    void RefreshScriptLibrary();
+    bool ScriptLibraryLoaded() const { return scriptLibraryLoaded; }
+    QJsonArray ScriptLibrary() const;
     void RegisterServiceConfig(const QString &serviceName, const QString &ax_script);
     void ProcessAxScriptPacket(const QString &name, const QString &content, const QJsonArray &groups);
     void registerServerCommandGroups(const QString &scriptName, const QList<ServerScriptGroup> &groups, QJSEngine* engine);
@@ -222,6 +232,9 @@ public:
     void ShowTunnelCreator(const QString &AgentId, bool socks4, bool socks5, bool lportfwd, bool rportfwd);
 
 Q_SIGNALS:
+    // Emitted after /automation/scripts/list has populated the cache.
+    void ScriptLibraryRefreshed();
+
     void SyncedSignal();
     void SyncedOnReloadSignal(QString project);
     void LoadGlobalScriptSignal(QString path);

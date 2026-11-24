@@ -65,7 +65,7 @@ void MainAdaptix::Start() const
 
         ChannelThread->start();
 
-        timeoutTimer.start(5000);
+        timeoutTimer.start(15000);
         loop.exec();
 
         if (!timeoutTimer.isActive()) {
@@ -139,7 +139,7 @@ void MainAdaptix::NewProject() const
 
         ChannelThread->start();
 
-        timeoutTimer.start(5000);
+        timeoutTimer.start(15000);
         loop.exec();
 
         if (!timeoutTimer.isActive()) {

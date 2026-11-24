@@ -1,0 +1,28 @@
+{
+  "id": "cleanup_traces",
+  "name": "清理行动痕迹",
+  "description": "清理 shell / 解释器 history、apt-dpkg 日志、落地脚本等痕迹。不会移除任何持久化后门，保留控制通道。",
+  "os": ["linux", "macos"],
+  "args": [
+    {
+      "name": "--user",
+      "description": "目标用户，默认当前用户",
+      "required": false,
+      "default": ""
+    },
+    {
+      "name": "--dry-run",
+      "description": "只打印将要执行的清理动作",
+      "required": false,
+      "default": ""
+    },
+    {
+      "name": "--keep-agent-payload",
+      "description": "保留已上传的 agent / 脚本文件",
+      "required": false,
+      "default": ""
+    }
+  ],
+  "destructive": true,
+  "version": "1.0"
+}

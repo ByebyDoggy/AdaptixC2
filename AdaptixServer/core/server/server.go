@@ -56,6 +56,8 @@ func NewTeamserver() *Teamserver {
 	ts.TaskManager = NewTaskManager(ts)
 	ts.TunnelManager = NewTunnelManager(ts)
 	ts.Extender = extender.NewExtender(ts)
+	ts.notifyChannelsRegistry = newNotifyChannelRegistry(ts)
+	ts.automationStore = newAutomationStore()
 	return ts
 }
 
@@ -185,6 +187,9 @@ func (ts *Teamserver) Start() {
 		err     error
 	)
 
+	ts.loadChainConfig()
+	ts.loadAutomationStore()
+
 	interfaces, err := net.Interfaces()
 	if err == nil {
 		ts.Parameters.Interfaces = append(ts.Parameters.Interfaces, "0.0.0.0")
@@ -216,6 +221,7 @@ func (ts *Teamserver) Start() {
 	ts.Extender.LoadPlugins(ts.Profile.Server.Extenders)
 
 	ts.TsAxScriptLoadFromProfile()
+	ts.RegisterAutoExecHooks()
 
 	go ts.AdaptixServer.Start(&stopped)
 	logs.Success("", "Starting server -> https://%s:%v%s", ts.Profile.Server.Interface, ts.Profile.Server.Port, ts.Profile.Server.Endpoint)

@@ -7,6 +7,8 @@
 #include <UI/Dialogs/DialogExtender.h>
 #include <UI/Dialogs/DialogSettings.h>
 #include <UI/Dialogs/DialogSubscriptions.h>
+#include <UI/Dialogs/DialogChain.h>
+#include <UI/Dialogs/DialogAutomation.h>
 #include <Client/Extender.h>
 #include <Client/Settings.h>
 #include <Client/AuthProfile.h>
@@ -55,9 +57,21 @@ MainUI::MainUI()
     connect(settingsAction, &QAction::triggered, this, &MainUI::onSettings);
     menuSettings->addAction(settingsAction);
 
+    auto chainAction = new QAction("C2 Domain / Chain", this);
+    connect(chainAction, &QAction::triggered, this, &MainUI::onChainConfig);
+    menuSettings->addAction(chainAction);
+
+    auto automationAction = new QAction("Automation / AutoExec", this);
+    connect(automationAction, &QAction::triggered, this, &MainUI::onAutomation);
+    menuSettings->addAction(automationAction);
+
+    auto menuAutomation = new QMenu("Automation", this);
+    menuAutomation->addAction(automationAction);
+
     auto mainMenuBar = new QMenuBar(this);
     mainMenuBar->addMenu(menuProject);
     mainMenuBar->addMenu(menuExtensions);
+    mainMenuBar->addMenu(menuAutomation);
     mainMenuBar->addMenu(menuSettings);
 
     this->setMenuBar(mainMenuBar);
@@ -219,6 +233,28 @@ void MainUI::onScriptManager()
 }
 
 void MainUI::onSettings() { GlobalClient->settings->getDialogSettings()->show(); }
+
+void MainUI::onChainConfig()
+{
+    AuthProfile* profile = GetCurrentProfile();
+    if (!profile)
+        return;
+
+    auto* dialog = new DialogChain(profile);
+    dialog->setAttribute(Qt::WA_DeleteOnClose);
+    dialog->show();
+}
+
+void MainUI::onAutomation()
+{
+    AuthProfile* profile = GetCurrentProfile();
+    if (!profile)
+        return;
+
+    auto* dialog = new DialogAutomation(profile);
+    dialog->setAttribute(Qt::WA_DeleteOnClose);
+    dialog->show();
+}
 
 void MainUI::onProjectSubscriptions()
 {

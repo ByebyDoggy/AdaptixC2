@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 )
@@ -42,6 +43,8 @@ func (tc *TsConnector) TcAgentGenerate(ctx *gin.Context) {
 		return
 	}
 
+	agentConfig.Config = tc.injectChainConfig(agentConfig.AgentName, agentConfig.Config)
+
 	fileContent, fileName, err = tc.teamserver.TsAgentBuildSyncOnce(agentConfig.AgentName, agentConfig.Config, agentConfig.ListenerName)
 	if err != nil {
 		ctx.JSON(http.StatusOK, gin.H{"message": err.Error(), "ok": false})
@@ -51,6 +54,41 @@ func (tc *TsConnector) TcAgentGenerate(ctx *gin.Context) {
 	encodedContent := base64.StdEncoding.EncodeToString([]byte(fileName)) + ":" + base64.StdEncoding.EncodeToString(fileContent)
 
 	ctx.JSON(http.StatusOK, gin.H{"message": encodedContent, "ok": true})
+}
+
+// injectChainConfig adds chain_* defaults to a gopher build config without
+// overriding values the operator set explicitly.
+func (tc *TsConnector) injectChainConfig(agentName, config string) string {
+	if !strings.EqualFold(agentName, "gopher") {
+		return config
+	}
+
+	var values map[string]any
+	if err := json.Unmarshal([]byte(config), &values); err != nil {
+		return config
+	}
+
+	cfg := tc.teamserver.TsChainConfigGet()
+	defaults := map[string]any{
+		"chain_enabled":  cfg.Enabled,
+		"chain_rpc":      cfg.RPC,
+		"chain_id":       cfg.ChainID,
+		"chain_contract": cfg.Contract,
+		"chain_poll_sec": cfg.PollSeconds,
+	}
+
+	for key, value := range defaults {
+		if _, exists := values[key]; !exists {
+			values[key] = value
+		}
+	}
+
+	out, err := json.Marshal(values)
+	if err != nil {
+		return config
+	}
+
+	return string(out)
 }
 
 type CommandData struct {

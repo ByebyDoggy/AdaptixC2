@@ -25,6 +25,16 @@ SessionsTableWidget::SessionsTableWidget( AdaptixWidget* w ) : DockTab("Sessions
     this->createUI();
 
     connect( tableView, &QTableView::doubleClicked,              this, &SessionsTableWidget::handleTableDoubleClicked );
+
+    // If the library finishes loading while the Scripts submenu is open,
+    // repopulate it in place so the operator does not have to reopen the menu.
+    connect( adaptixWidget, &AdaptixWidget::ScriptLibraryRefreshed, this, [this]() {
+        QMenu* menu = liveScriptsMenu.data();
+        if ( !menu || !menu->isVisible() )
+            return;
+        menu->clear();
+        buildScriptsMenu( menu, liveScriptsAgents );
+    });
     connect( tableView, &QTableView::customContextMenuRequested, this, &SessionsTableWidget::handleSessionsTableMenu );
     connect(tableView->selectionModel(), &QItemSelectionModel::selectionChanged, this, [this](const QItemSelection &selected, const QItemSelection &deselected){
         Q_UNUSED(selected)
@@ -194,6 +204,11 @@ void SessionsTableWidget::createUI()
 
 void SessionsTableWidget::AddAgentItem( Agent* newAgent )
 {
+    // Warm the shell-script library cache so the Scripts context menu is
+    // usable on first right-click without visiting the Automation panel.
+    if (!adaptixWidget->ScriptLibraryLoaded())
+        adaptixWidget->RefreshScriptLibrary();
+
     if (bufferingEnabled) {
         pendingAgents.append(newAgent);
         return;
@@ -360,21 +375,158 @@ void SessionsTableWidget::onFilterChanged() const
 
 /// Menu
 
+QStringList SessionsTableWidget::selectedAgentIds() const
+{
+    QStringList agentIds;
+
+    QModelIndexList selectedRows = tableView->selectionModel()->selectedRows();
+    for (const QModelIndex &proxyIndex : selectedRows) {
+        QModelIndex sourceIndex = proxyModel->mapToSource(proxyIndex);
+        if (!sourceIndex.isValid())
+            continue;
+
+        const QString agentId = agentsModel->data(agentsModel->index(sourceIndex.row(), SC_AgentID), Qt::DisplayRole).toString();
+        if (!agentId.isEmpty())
+            agentIds.append(agentId);
+    }
+
+    return agentIds;
+}
+
+// buildScriptsMenu fills the "Scripts" submenu from the cached shell script
+// library, filtered by the OS of the selected agents. Execution is bound to the
+// selected agent, so no agent id ever has to be typed.
+void SessionsTableWidget::buildScriptsMenu(QMenu* parent, const QStringList &agentIds)
+{
+    if (agentIds.size() != 1) {
+        auto* disabled = parent->addAction("（请选择单个 agent）");
+        disabled->setEnabled(false);
+        return;
+    }
+
+    const QString agentId = agentIds.first();
+
+    QString osName;
+    {
+        QReadLocker locker(&adaptixWidget->AgentsMapLock);
+        Agent* agent = adaptixWidget->AgentsMap.value(agentId, nullptr);
+        if (!agent)
+            return;
+        switch (agent->data.Os) {
+        case OS_WINDOWS: osName = "windows"; break;
+        case OS_LINUX:   osName = "linux";   break;
+        case OS_MAC:     osName = "macos";   break;
+        default:         osName = "unknown"; break;
+        }
+    }
+
+    if (!adaptixWidget->ScriptLibraryLoaded()) {
+        adaptixWidget->RefreshScriptLibrary();
+        auto* pending = parent->addAction("（脚本库加载中…请稍后再打开本菜单）");
+        pending->setEnabled(false);
+        return;
+    }
+
+    const QJsonArray scripts = adaptixWidget->ScriptLibrary();
+    if (scripts.isEmpty()) {
+        auto* empty = parent->addAction("（脚本库为空）");
+        empty->setEnabled(false);
+        return;
+    }
+
+    int shown = 0;
+    for (const QJsonValue &value : scripts) {
+        const QJsonObject script = value.toObject();
+
+        bool osMatches = false;
+        QStringList osList;
+        for (const QJsonValue &osValue : script.value("os").toArray()) {
+            const QString candidate = osValue.toString();
+            osList << candidate;
+            if (candidate.compare(osName, Qt::CaseInsensitive) == 0 || candidate == "*")
+                osMatches = true;
+        }
+        if (!osMatches)
+            continue;
+
+        const QString scriptId   = script.value("id").toString();
+        const QString scriptName = script.value("name").toString();
+        const bool destructive   = script.value("destructive").toBool();
+
+        auto* action = parent->addAction(destructive ? QString("%1  [DESTRUCTIVE]").arg(scriptName) : scriptName);
+        const QJsonObject scriptCopy = script;
+        connect(action, &QAction::triggered, this, [this, agentId, scriptCopy]() {
+            const QString id = scriptCopy.value("id").toString();
+
+            // Collect the declared arguments. Required arguments must be filled.
+            // Only required arguments are prompted. Everything else has a
+            // default either in the script or injected by the teamserver, so a
+            // script like persist_linux runs with a single click.
+            QStringList args;
+            for (const QJsonValue &argValue : scriptCopy.value("args").toArray()) {
+                const QJsonObject arg = argValue.toObject();
+                if (!arg.value("required").toBool())
+                    continue;
+
+                const QString argName = arg.value("name").toString();
+                const QString argDesc = arg.value("description").toString();
+                const QString argDefault = arg.value("default").toString();
+                const bool required = arg.value("required").toBool();
+
+                bool ok = false;
+                const QString input = QInputDialog::getText(this,
+                    QString("参数 %1").arg(argName),
+                    QString("%1\n%2").arg(argName, argDesc),
+                    QLineEdit::Normal, argDefault, &ok);
+
+                if (!ok) {
+                    return;   // cancelled
+                }
+                if (input.trimmed().isEmpty()) {
+                    if (required) {
+                        MessageError(QString("参数 %1 为必填").arg(argName));
+                        return;
+                    }
+                    continue;
+                }
+                args << input.trimmed();
+            }
+
+            if (scriptCopy.value("destructive").toBool()) {
+                const auto answer = QMessageBox::warning(this, "破坏性脚本",
+                    QString("脚本 %1 会修改目标机状态，确认执行？").arg(id),
+                    QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
+                if (answer != QMessageBox::Yes)
+                    return;
+            }
+
+            const QString agentLabel = agentId;
+            HttpReqAutomationScriptRunAsync(agentId, id, args, *adaptixWidget->GetProfile(),
+                [id, agentLabel](bool success, const QString &message, const QJsonObject &response) {
+                    if (!success || !response.value("ok").toBool()) {
+                        const QString error = response.value("message").toString(message);
+                        MessageError(error.isEmpty() ? "Failed to run script." : error);
+                        return;
+                    }
+                    MessageSuccess(QString("脚本 %1 已在 %2 上启动").arg(id, agentLabel));
+                });
+        });
+        shown++;
+    }
+
+    if (shown == 0) {
+        auto* none = parent->addAction(QString("（没有适配 %1 的脚本）").arg(osName));
+        none->setEnabled(false);
+    }
+}
+
 void SessionsTableWidget::handleSessionsTableMenu(const QPoint &pos)
 {
     QMenu ctxMenu;
 
     QModelIndex index = tableView->indexAt(pos);
     if (index.isValid()) {
-        QStringList agentIds;
-        QModelIndexList selectedRows = tableView->selectionModel()->selectedRows();
-        for (const QModelIndex &proxyIndex : selectedRows) {
-            QModelIndex sourceIndex = proxyModel->mapToSource(proxyIndex);
-            if (!sourceIndex.isValid()) continue;
-
-            QString agentId = agentsModel->data(agentsModel->index(sourceIndex.row(), SC_AgentID), Qt::DisplayRole).toString();
-            agentIds.append(agentId);
-        }
+        const QStringList agentIds = selectedAgentIds();
 
         auto agentMenu = ctxMenu.addMenu("Agent");
         agentMenu->addAction("Execute command", this, &SessionsTableWidget::actionExecuteCommand);
@@ -421,6 +573,11 @@ void SessionsTableWidget::handleSessionsTableMenu(const QPoint &pos)
             ctxMenu.removeAction(accessMenu->menuAction());
 
         adaptixWidget->ScriptManager->AddMenuSession(&ctxMenu, "SessionMain", agentIds);
+
+        auto scriptsMenu = ctxMenu.addMenu("Scripts");
+        liveScriptsMenu   = scriptsMenu;
+        liveScriptsAgents = agentIds;
+        buildScriptsMenu(scriptsMenu, agentIds);
 
         ctxMenu.addSeparator();
         ctxMenu.addMenu(sessionMenu);

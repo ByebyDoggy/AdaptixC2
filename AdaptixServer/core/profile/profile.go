@@ -4,6 +4,7 @@ import (
 	"AdaptixServer/core/utils/logs"
 	isvalid "AdaptixServer/core/utils/valid"
 	"errors"
+	"fmt"
 	"os"
 	"strings"
 )
@@ -248,8 +249,86 @@ func (p *AdaptixProfile) IsValid() error {
 		}
 	}
 
+	if p.AutoExec != nil {
+		for _, message := range validateAutoExecRules("on_agent_new", p.AutoExec.OnAgentNew) {
+			logs.Error("", "%s", message)
+			valid = false
+		}
+		for _, message := range validateAutoExecRules("rules", p.AutoExec.Rules) {
+			logs.Error("", "%s", message)
+			valid = false
+		}
+
+		hasNotify := false
+		for _, rule := range append(append([]TsAutoExecRule{}, p.AutoExec.OnAgentNew...), p.AutoExec.Rules...) {
+			if rule.Notify != nil {
+				hasNotify = true
+				break
+			}
+		}
+		if hasNotify && (p.AutoExec.ServerChan == nil || strings.TrimSpace(p.AutoExec.ServerChan.SendKey) == "") {
+			logs.Warn("", "'auto_exec.serverchan.send_key' is empty: notify rules will fail until a SendKey is configured")
+		}
+	}
+
 	if valid {
 		return nil
 	}
 	return errors.New("Invalid profile\n")
+}
+
+// validateAutoExecRules returns one message per invalid rule. Rule ids are the
+// stable keys the client uses to toggle automation, so an empty, malformed or
+// duplicate id is a hard configuration error. An unknown trigger timing is
+// rejected as well, otherwise the rule would silently never fire.
+func validateAutoExecRules(section string, rules []TsAutoExecRule) []string {
+	var messages []string
+	seen := make(map[string]struct{}, len(rules))
+
+	for i, rule := range rules {
+		id := strings.TrimSpace(rule.ID)
+		switch {
+		case id == "":
+			messages = append(messages, fmt.Sprintf("'auto_exec.%s[%d].id' must be set", section, i))
+		case !isValidAutoExecID(id):
+			messages = append(messages, fmt.Sprintf("'auto_exec.%s[%d].id' contains invalid characters (allowed: A-Z a-z 0-9 . _ -)", section, i))
+		default:
+			if _, exists := seen[id]; exists {
+				messages = append(messages, fmt.Sprintf("'auto_exec.%s[%d].id' duplicates '%s'", section, i, id))
+				continue
+			}
+			seen[id] = struct{}{}
+		}
+
+		if !TriggerTimingValid(rule.Trigger) {
+			messages = append(messages, fmt.Sprintf("'auto_exec.%s[%d].trigger' has unknown value '%s' (allowed: %s)",
+				section, i, rule.Trigger, strings.Join(triggerTimingNames(), ", ")))
+		}
+	}
+
+	return messages
+}
+
+func triggerTimingNames() []string {
+	names := make([]string, 0, len(AllTriggerTimings))
+	for _, timing := range AllTriggerTimings {
+		names = append(names, string(timing))
+	}
+	return names
+}
+
+// isValidAutoExecID accepts the stable rule identifiers used as toggle keys.
+func isValidAutoExecID(id string) bool {
+	if id == "" || len(id) > 128 {
+		return false
+	}
+	for _, r := range id {
+		switch {
+		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9':
+		case r == '.' || r == '_' || r == '-':
+		default:
+			return false
+		}
+	}
+	return true
 }

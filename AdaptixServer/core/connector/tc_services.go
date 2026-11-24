@@ -35,7 +35,7 @@ func (tc *TsConnector) TcServiceCall(ctx *gin.Context) {
 		ctx.JSON(http.StatusOK, gin.H{"message": "error", "error": "service_name is required"})
 		return
 	}
-	
+
 	go tc.teamserver.TsServiceCall(jsonData.ServiceName, username, jsonData.Command, jsonData.Args)
 
 	ctx.JSON(http.StatusOK, gin.H{"message": "success", "result": "ok"})

@@ -36,6 +36,8 @@ public:
 
     void onScriptManager();
     static void onSettings();
+    void onChainConfig();
+    void onAutomation();
 
     void AddNewProject(AuthProfile* profile, QThread* channelThread, WebSocketWorker* channelWsWorker);
 

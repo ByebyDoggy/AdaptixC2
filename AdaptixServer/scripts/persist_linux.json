@@ -1,0 +1,61 @@
+{
+  "id": "persist_linux",
+  "name": "Linux 持久化（一键）",
+  "description": "一键安装持久化：服务端自动生成 SSH 密钥并把公钥写入目标，定时任务默认每小时执行且已在运行时不重复拉起，复用当前 agent 的可执行文件。无需填写任何参数。",
+  "os": [
+    "linux",
+    "macos"
+  ],
+  "args": [
+    {
+      "name": "--method",
+      "description": "all（默认，SSH key + cron）| sshkey | cron | systemd | list",
+      "required": false,
+      "default": "all"
+    },
+    {
+      "name": "--key-b64",
+      "description": "SSH 公钥（base64）；服务端自动生成并注入，无需填写",
+      "required": false,
+      "default": ""
+    },
+    {
+      "name": "--key",
+      "description": "SSH 公钥明文（手动场景用；空格会被拆开，优先用 --key-b64）",
+      "required": false,
+      "default": ""
+    },
+    {
+      "name": "--agent-pid",
+      "description": "agent 的 PID；由服务端自动注入，用于定位当前 payload 路径",
+      "required": false,
+      "default": ""
+    },
+    {
+      "name": "--schedule",
+      "description": "cron 计划，默认每小时；用下划线代替空格，如 0_*_*_*_*",
+      "required": false,
+      "default": "0 * * * *"
+    },
+    {
+      "name": "--command",
+      "description": "要持久化的命令，默认取当前 agent 可执行文件",
+      "required": false,
+      "default": ""
+    },
+    {
+      "name": "--name",
+      "description": "产物名称，默认 adaptix-persist（服务端按主机名注入 adaptix-<host>）",
+      "required": false,
+      "default": "adaptix-persist"
+    },
+    {
+      "name": "--interval",
+      "description": "systemd timer 间隔秒数，默认 3600",
+      "required": false,
+      "default": "3600"
+    }
+  ],
+  "destructive": false,
+  "version": "2.0"
+}

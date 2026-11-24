@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"crypto/aes"
 	"crypto/cipher"
@@ -14,6 +15,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/url"
 	"os"
 	"regexp"
 	"strconv"
@@ -139,6 +141,14 @@ func validConfig(config string) error {
 			continue
 		}
 
+		if strings.HasPrefix(line, "wss://") || strings.HasPrefix(line, "ws://") {
+			u, uerr := url.Parse(line)
+			if uerr != nil || u.Host == "" {
+				return fmt.Errorf("Invalid ws url: %s\n", line)
+			}
+			continue
+		}
+
 		host, portStr, err := net.SplitHostPort(line)
 		if err != nil {
 			return fmt.Errorf("Invalid address (cannot split host:port): %s\n", line)
@@ -235,6 +245,10 @@ func (t *TransportTCP) handleConnection(conn net.Conn, ts Teamserver) {
 		_, _ = conn.Write([]byte(t.Config.TcpBanner))
 	}
 
+	buffered := &bufferedConn{Conn: conn, r: bufio.NewReader(conn)}
+	conn = buffered
+	proxyIP := readProxyClientIP(buffered)
+
 	connection := Connection{
 		conn: conn,
 	}
@@ -273,7 +287,10 @@ func (t *TransportTCP) handleConnection(conn net.Conn, ts Teamserver) {
 
 		agentId := fmt.Sprintf("%08x", initPack.Id)
 		agentType := fmt.Sprintf("%08x", initPack.Type)
-		ExternalIP := strings.Split(conn.RemoteAddr().String(), ":")[0]
+		ExternalIP := proxyIP
+		if ExternalIP == "" {
+			ExternalIP = strings.Split(conn.RemoteAddr().String(), ":")[0]
+		}
 
 		if !Ts.TsAgentIsExists(agentId) {
 			_, err = Ts.TsAgentCreate(agentType, agentId, initPack.Data, t.Name, ExternalIP, false)
@@ -283,9 +300,10 @@ func (t *TransportTCP) handleConnection(conn net.Conn, ts Teamserver) {
 		} else {
 			emptyMark := ""
 			_ = Ts.TsAgentUpdateDataPartial(agentId, struct {
-				Mark     *string `json:"mark"`
-				Listener *string `json:"listener"`
-			}{Mark: &emptyMark, Listener: &t.Name})
+				Mark       *string `json:"mark"`
+				Listener   *string `json:"listener"`
+				ExternalIP *string `json:"external_ip"`
+			}{Mark: &emptyMark, Listener: &t.Name, ExternalIP: &ExternalIP})
 		}
 
 		t.AgentConnects.Put(agentId, connection)
@@ -594,6 +612,37 @@ func connRead(conn net.Conn, size int) ([]byte, error) {
 	return message, nil
 }
 
+type bufferedConn struct {
+	net.Conn
+	r *bufio.Reader
+}
+
+func (c *bufferedConn) Read(p []byte) (int, error) {
+	return c.r.Read(p)
+}
+
+// readProxyClientIP consumes an optional HAProxy PROXY protocol v1 header and
+// returns the advertised client IP. If no header is present, the buffered data
+// is left untouched for the normal gopher handshake.
+func readProxyClientIP(c *bufferedConn) string {
+	_ = c.SetReadDeadline(time.Now().Add(5 * time.Second))
+	defer c.SetReadDeadline(time.Time{})
+
+	peek, err := c.r.Peek(6)
+	if err != nil || string(peek) != "PROXY " {
+		return ""
+	}
+	line, err := c.r.ReadString('\n')
+	if err != nil {
+		return ""
+	}
+	fields := strings.Fields(strings.TrimSpace(line))
+	if len(fields) >= 6 && fields[0] == "PROXY" && (fields[1] == "TCP4" || fields[1] == "TCP6") {
+		return fields[2]
+	}
+	return ""
+}
+
 func recvMsg(conn net.Conn) ([]byte, error) {
 	bufLen, err := connRead(conn, 4)
 	if err != nil {
@@ -618,8 +667,12 @@ func sendMsg(conn net.Conn, data []byte) error {
 
 func isClientConnected(conn net.Conn, ssl bool) bool {
 	var err error = nil
+	rawConn := conn
+	if bc, ok := conn.(*bufferedConn); ok {
+		rawConn = bc.Conn
+	}
 	if ssl {
-		tcpConn, ok := conn.(*tls.Conn)
+		tcpConn, ok := rawConn.(*tls.Conn)
 		if !ok {
 			return false
 		}
@@ -629,7 +682,7 @@ func isClientConnected(conn net.Conn, ssl bool) bool {
 		_ = tcpConn.SetReadDeadline(time.Time{})
 
 	} else {
-		tcpConn, ok := conn.(*net.TCPConn)
+		tcpConn, ok := rawConn.(*net.TCPConn)
 		if !ok {
 			return false
 		}

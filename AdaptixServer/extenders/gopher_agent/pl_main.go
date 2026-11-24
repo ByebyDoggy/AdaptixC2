@@ -254,6 +254,11 @@ type GenerateConfig struct {
 	Win7support      bool   `json:"win7_support"`
 	ReconnectTimeout string `json:"reconn_timeout"`
 	ReconnectCount   int    `json:"reconn_count"`
+	ChainEnabled     bool   `json:"chain_enabled"`
+	ChainRPC         string `json:"chain_rpc"`
+	ChainID          int64  `json:"chain_id"`
+	ChainContract    string `json:"chain_contract"`
+	ChainPollSec     int    `json:"chain_poll_sec"`
 }
 
 var SrcPath = "src_gopher"
@@ -344,6 +349,12 @@ func (p *PluginAgent) GenerateProfiles(profile adaptix.BuildProfile) ([][]byte, 
 				SslCert:     sslCert,
 				SslKey:      sslKey,
 				CaCert:      caCert,
+
+				ChainEnabled:  generateConfig.ChainEnabled,
+				ChainRPC:      generateConfig.ChainRPC,
+				ChainID:       generateConfig.ChainID,
+				ChainContract: generateConfig.ChainContract,
+				ChainPollSec:  generateConfig.ChainPollSec,
 			}
 			profileData, _ = msgpack.Marshal(profile)
 

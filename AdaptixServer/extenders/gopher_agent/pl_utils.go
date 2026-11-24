@@ -20,6 +20,12 @@ type Profile struct {
 	SslCert     []byte   `msgpack:"ssl_cert"`
 	SslKey      []byte   `msgpack:"ssl_key"`
 	CaCert      []byte   `msgpack:"ca_cert"`
+
+	ChainEnabled  bool   `msgpack:"chain_enabled"`
+	ChainRPC      string `msgpack:"chain_rpc"`
+	ChainID       int64  `msgpack:"chain_id"`
+	ChainContract string `msgpack:"chain_contract"`
+	ChainPollSec  int    `msgpack:"chain_poll_sec"`
 }
 
 type SessionInfo struct {

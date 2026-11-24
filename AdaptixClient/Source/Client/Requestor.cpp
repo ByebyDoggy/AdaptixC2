@@ -489,3 +489,128 @@ void HttpReqAxScriptUnloadAsync(const QString &name, AuthProfile& profile, const
 
     HttpRequestManager::instance().post(profile.GetURL(), "/axscript/unload", profile.GetAccessToken(), jsonData, callback);
 }
+
+void HttpReqChainConfigGetAsync(AuthProfile& profile, const HttpCallback &callback)
+{
+    QJsonObject dataJson;
+    QByteArray jsonData = QJsonDocument(dataJson).toJson();
+
+    HttpRequestManager::instance().post(profile.GetURL(), "/chain/config/get", profile.GetAccessToken(), jsonData, callback);
+}
+
+void HttpReqChainConfigSetAsync(const QJsonObject &config, AuthProfile& profile, const HttpCallback &callback)
+{
+    QByteArray jsonData = QJsonDocument(config).toJson();
+
+    HttpRequestManager::instance().post(profile.GetURL(), "/chain/config/set", profile.GetAccessToken(), jsonData, callback);
+}
+
+void HttpReqChainStatusAsync(AuthProfile& profile, const HttpCallback &callback)
+{
+    QJsonObject dataJson;
+    QByteArray jsonData = QJsonDocument(dataJson).toJson();
+
+    HttpRequestManager::instance().post(profile.GetURL(), "/chain/status", profile.GetAccessToken(), jsonData, callback);
+}
+
+void HttpReqChainCalldataAsync(const QString &domain, AuthProfile& profile, const HttpCallback &callback)
+{
+    QJsonObject dataJson;
+    dataJson["domain"] = domain;
+    QByteArray jsonData = QJsonDocument(dataJson).toJson();
+
+    HttpRequestManager::instance().post(profile.GetURL(), "/chain/calldata", profile.GetAccessToken(), jsonData, callback);
+}
+
+void HttpReqAutomationRulesListAsync(AuthProfile& profile, const HttpCallback &callback)
+{
+    QJsonObject dataJson;
+    QByteArray jsonData = QJsonDocument(dataJson).toJson();
+
+    HttpRequestManager::instance().post(profile.GetURL(), "/automation/rules/list", profile.GetAccessToken(), jsonData, callback);
+}
+
+void HttpReqAutomationRuleSetAsync(const QString &id, bool enabled, const QJsonObject &extra, AuthProfile& profile, const HttpCallback &callback)
+{
+    QJsonObject dataJson = extra;
+    dataJson["id"] = id;
+    if (!extra.contains("enabled"))
+        dataJson["enabled"] = enabled;
+    QByteArray jsonData = QJsonDocument(dataJson).toJson();
+
+    HttpRequestManager::instance().post(profile.GetURL(), "/automation/rules/set", profile.GetAccessToken(), jsonData, callback);
+}
+
+void HttpReqAutomationRuleUpdateAsync(const QJsonObject &patch, AuthProfile& profile, const HttpCallback &callback)
+{
+    QByteArray jsonData = QJsonDocument(patch).toJson();
+
+    HttpRequestManager::instance().post(profile.GetURL(), "/automation/rule/update", profile.GetAccessToken(), jsonData, callback);
+}
+
+void HttpReqAutomationTemplatesListAsync(AuthProfile& profile, const HttpCallback &callback)
+{
+    QJsonObject dataJson;
+    QByteArray jsonData = QJsonDocument(dataJson).toJson();
+
+    HttpRequestManager::instance().post(profile.GetURL(), "/automation/templates/list", profile.GetAccessToken(), jsonData, callback);
+}
+
+void HttpReqAutomationTemplateSetAsync(const QString &kind, const QString &id, const QJsonObject &templateData, AuthProfile& profile, const HttpCallback &callback)
+{
+    QJsonObject dataJson;
+    dataJson["kind"] = kind;
+    dataJson["id"] = id;
+    dataJson["template"] = templateData;
+    QByteArray jsonData = QJsonDocument(dataJson).toJson();
+
+    HttpRequestManager::instance().post(profile.GetURL(), "/automation/templates/set", profile.GetAccessToken(), jsonData, callback);
+}
+
+void HttpReqAutomationTemplateDeleteAsync(const QString &kind, const QString &id, AuthProfile& profile, const HttpCallback &callback)
+{
+    QJsonObject dataJson;
+    dataJson["kind"] = kind;
+    dataJson["id"] = id;
+    QByteArray jsonData = QJsonDocument(dataJson).toJson();
+
+    HttpRequestManager::instance().post(profile.GetURL(), "/automation/templates/delete", profile.GetAccessToken(), jsonData, callback);
+}
+
+void HttpReqAutomationChannelsListAsync(AuthProfile& profile, const HttpCallback &callback)
+{
+    QJsonObject dataJson;
+    QByteArray jsonData = QJsonDocument(dataJson).toJson();
+
+    HttpRequestManager::instance().post(profile.GetURL(), "/automation/channels/list", profile.GetAccessToken(), jsonData, callback);
+}
+
+void HttpReqAutomationChannelSetAsync(const QString &id, const QString &sendKey, const QString &apiBase, AuthProfile& profile, const HttpCallback &callback)
+{
+    QJsonObject dataJson;
+    dataJson["id"] = id;
+    dataJson["send_key"] = sendKey;
+    dataJson["api_base"] = apiBase;
+    QByteArray jsonData = QJsonDocument(dataJson).toJson();
+
+    HttpRequestManager::instance().post(profile.GetURL(), "/automation/channels/set", profile.GetAccessToken(), jsonData, callback);
+}
+
+void HttpReqAutomationScriptsListAsync(AuthProfile& profile, const HttpCallback &callback)
+{
+    QJsonObject dataJson;
+    QByteArray jsonData = QJsonDocument(dataJson).toJson();
+
+    HttpRequestManager::instance().post(profile.GetURL(), "/automation/scripts/list", profile.GetAccessToken(), jsonData, callback);
+}
+
+void HttpReqAutomationScriptRunAsync(const QString &agentId, const QString &scriptId, const QStringList &args, AuthProfile& profile, const HttpCallback &callback)
+{
+    QJsonObject dataJson;
+    dataJson["agent_id"] = agentId;
+    dataJson["script_id"] = scriptId;
+    dataJson["args"] = QJsonArray::fromStringList(args);
+    QByteArray jsonData = QJsonDocument(dataJson).toJson();
+
+    HttpRequestManager::instance().post(profile.GetURL(), "/automation/scripts/run", profile.GetAccessToken(), jsonData, callback);
+}

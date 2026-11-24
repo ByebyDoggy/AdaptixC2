@@ -44,6 +44,26 @@ type Teamserver interface {
 	TsAgentCommand(agentName string, agentId string, clientName string, hookId string, handlerId string, cmdline string, ui bool, args map[string]any) error
 	TsAgentBuildSyncOnce(agentName string, config string, listenersName []string) ([]byte, string, error)
 
+	TsChainConfigGet() profile.TsChainConfig
+	TsChainConfigSet(config profile.TsChainConfig) error
+	TsChainStatus() (profile.TsChainStatus, error)
+	TsChainCalldata(domain string) (string, error)
+
+	AutomationRulesSnapshot() []profile.AutomationRuleView
+	SetAutomationRuleEnabled(id string, enabled bool) error
+	SetAutomationRuleOrder(id string, order int) error
+	AutomationRuleUpdate(ruleID string, patch map[string]any) error
+	TsAutomationTemplatesList(kind string) []profile.AutomationTemplateView
+	TsAutomationTemplateGet(kind string, id string) (profile.AutomationTemplateView, error)
+	TsAutomationTemplateSet(kind string, id string, view profile.AutomationTemplateView) error
+	TsAutomationTemplateDelete(kind string, id string) error
+	TsAutomationChannelsList() []profile.AutomationChannelView
+	TsAutomationChannelSet(id string, sendKey string, apiBase string) error
+	TsScriptsList() []profile.ScriptManifest
+	TsScriptRun(agentId string, scriptID string, args []string) error
+	TsPersistKeyInfo() (profile.PersistKeyView, error)
+	TsPersistKeyPrivate() (string, error)
+
 	TsAgentUpdateData(newAgentData adaptix.AgentData) error
 	TsAgentUpdateDataPartial(agentId string, updateData interface{}) error
 	TsAgentTerminate(agentId string, terminateTaskId string) error
@@ -253,6 +273,12 @@ func NewTsConnector(ts Teamserver, tsProfile profile.TsProfile, httpServer profi
 	var connector = new(TsConnector)
 	connector.Engine = gin.New()
 	connector.Engine.Use(gin.Recovery())
+	connector.Engine.Use(func(c *gin.Context) {
+		c.Next()
+		if strings.HasPrefix(c.Request.URL.Path, tsProfile.Endpoint) {
+			logs.Info("", fmt.Sprintf("HTTP %s %s %d %s", c.Request.Method, c.Request.URL.Path, c.Writer.Status(), c.ClientIP()))
+		}
+	})
 	connector.teamserver = ts
 	connector.Interface = tsProfile.Interface
 	connector.Port = tsProfile.Port
@@ -362,6 +388,25 @@ func NewTsConnector(ts Teamserver, tsProfile profile.TsProfile, httpServer profi
 		api_group.POST("/agent/task/delete", connector.TcAgentTaskDelete)
 		api_group.POST("/agent/task/hook", connector.TcAgentTaskHook)
 		api_group.POST("/agent/task/save", connector.TcAgentTaskSave)
+
+		api_group.POST("/chain/config/get", connector.TcChainConfigGet)
+		api_group.POST("/chain/config/set", connector.TcChainConfigSet)
+		api_group.POST("/chain/status", connector.TcChainStatus)
+		api_group.POST("/chain/calldata", connector.TcChainCalldata)
+
+		api_group.POST("/automation/rules/list", connector.TcAutomationRulesList)
+		api_group.POST("/automation/rules/set", connector.TcAutomationRulesSet)
+		api_group.POST("/automation/rule/update", connector.TcAutomationRuleUpdate)
+		api_group.POST("/automation/templates/list", connector.TcAutomationTemplatesList)
+		api_group.POST("/automation/templates/get", connector.TcAutomationTemplateGet)
+		api_group.POST("/automation/templates/set", connector.TcAutomationTemplateSet)
+		api_group.POST("/automation/templates/delete", connector.TcAutomationTemplateDelete)
+		api_group.POST("/automation/channels/list", connector.TcAutomationChannelsList)
+		api_group.POST("/automation/channels/set", connector.TcAutomationChannelSet)
+		api_group.POST("/automation/keys/info", connector.TcAutomationKeysInfo)
+		api_group.POST("/automation/keys/private", connector.TcAutomationKeysPrivate)
+		api_group.POST("/automation/scripts/list", connector.TcAutomationScriptsList)
+		api_group.POST("/automation/scripts/run", connector.TcAutomationScriptsRun)
 
 		api_group.POST("/chat/send", connector.TcChatSendMessage)
 

@@ -62,6 +62,14 @@ type Teamserver struct {
 	pivots        *safe.Slice // 			           : PivotData
 	OTPManager    *token.OTPManager
 	builders      safe.Map // buildId string      : build Build
+
+	chainMu     sync.RWMutex
+	chainConfig profile.TsChainConfig
+
+	automationMu    sync.RWMutex
+	automationStore automationStore
+
+	notifyChannelsRegistry *notifyChannelRegistry
 }
 
 type Agent struct {
