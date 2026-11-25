@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto/tls"
 	"net"
 	"net/url"
@@ -29,6 +30,11 @@ func dialWebSocket(rawurl string) (net.Conn, error) {
 	d := websocket.Dialer{
 		HandshakeTimeout: 10 * time.Second,
 		TLSClientConfig:  &tls.Config{InsecureSkipVerify: true},
+		// Force IPv4 so the callback source address (and CF-Connecting-IP)
+		// stays IPv4 even on dual-stack hosts.
+		NetDialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+			return (&net.Dialer{}).DialContext(ctx, "tcp4", addr)
+		},
 	}
 	ws, _, err := d.Dial(u.String(), nil)
 	if err != nil {

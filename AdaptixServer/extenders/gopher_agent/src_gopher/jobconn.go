@@ -32,7 +32,7 @@ func dialJobConn() (net.Conn, error) {
 	}
 
 	if !profile.UseSSL {
-		return net.Dial("tcp", addr)
+		return net.Dial("tcp4", addr)
 	}
 
 	cert, err := tls.X509KeyPair(profile.SslCert, profile.SslKey)
@@ -49,5 +49,5 @@ func dialJobConn() (net.Conn, error) {
 		InsecureSkipVerify: true,
 	}
 
-	return tls.Dial("tcp", addr, config)
+	return tls.Dial("tcp4", addr, config)
 }

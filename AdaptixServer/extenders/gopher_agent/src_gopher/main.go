@@ -188,10 +188,10 @@ func main() {
 				RootCAs:            caCertPool,
 				InsecureSkipVerify: true,
 			}
-			conn, err = tls.Dial("tcp", addr, config)
+			conn, err = tls.Dial("tcp4", addr, config)
 
 		} else {
-			conn, err = net.Dial("tcp", addr)
+			conn, err = net.Dial("tcp4", addr)
 		}
 		if err != nil {
 			continue
