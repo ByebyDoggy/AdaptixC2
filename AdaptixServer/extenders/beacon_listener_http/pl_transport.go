@@ -87,7 +87,7 @@ func validConfig(config string) error {
 	}
 
 	if len(conf.Callback_addresses) == 0 {
-		return errors.New("callback_servers is required")
+		return errors.New("callback_addresses is required")
 	}
 	for _, line := range conf.Callback_addresses {
 		line = strings.TrimSpace(line)
